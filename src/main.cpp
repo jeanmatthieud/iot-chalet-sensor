@@ -1,6 +1,5 @@
 #include <Arduino.h>
 
-#include <SPI.h>
 #include <RF24.h>
 #include <NewPing.h>
 #include <LowPower.h>
@@ -10,14 +9,27 @@
 #define ECHO_PIN     4
 #define MAX_DISTANCE 250
 
+#define ADDRESS_SELECTION_PIN 9
+
 #define NB_MEASURES 5
 #define NB_MEASURES_SKIP 1
 
-#define SLEEP_STEP_DURATION SLEEP_8S
-#define SLEEP_STEP_NB 2
+#define SLEEP_STEP_DURATION SLEEP_250MS
+#define SLEEP_STEP_NB 5
+
+#define PAYLOAD_SIZE 3
+
+//////////
+
+typedef struct {
+  uint8_t address;
+  unsigned short value;
+} Message;
+
+//////////
 
 uint8_t gatewayAddress[] = { 0x00, 0xA1, 0xB2, 0xC3, 0xD4 };
-uint8_t nodeAddress[] = { 0x01, 0xA1, 0xB2, 0xC3, 0xD4 };
+uint8_t nodeAddress[] = { 0xFF, 0xA1, 0xB2, 0xC3, 0xD4 };
 
 RF24 radio(7,8);
 NewPing sonar(TRIGGER_PIN, ECHO_PIN);
@@ -27,9 +39,18 @@ void setup() {
   pinMode(STEP_UP_PIN, OUTPUT);
   digitalWrite(STEP_UP_PIN, LOW);
 
+  // Pin for address selection
+  pinMode(ADDRESS_SELECTION_PIN, INPUT_PULLUP);
+  if(digitalRead(ADDRESS_SELECTION_PIN) == HIGH) {
+    nodeAddress[0] = 0x01;
+  } else {
+    nodeAddress[0] = 0x02;
+  }
+
   // Setup and configure radio
   radio.begin();
-  radio.enableDynamicPayloads();
+  //radio.enableDynamicPayloads();
+  radio.setPayloadSize(PAYLOAD_SIZE);
   radio.setDataRate(RF24_250KBPS);
   radio.setPALevel(RF24_PA_HIGH);
 
@@ -74,12 +95,16 @@ void loop() {
   // - Time to start the radio
   radio.powerUp();
 
-  byte valueToSend = round(avgMeasureCm / (double) (NB_MEASURES - NB_MEASURES_SKIP));
+  unsigned short valueToSend = (unsigned short) round(avgMeasureCm / (double) (NB_MEASURES - NB_MEASURES_SKIP));
 
   Serial.print(F("Now sending: "));
   Serial.println(valueToSend);
 
-  if ( radio.write(&valueToSend, 1) ) {
+  Message msg;
+  msg.value = valueToSend;
+  msg.address = nodeAddress[0];
+
+  if ( radio.write(&msg, PAYLOAD_SIZE) ) {
       if(!radio.available()) {
           Serial.println(F("Got blank ack"));
       }
