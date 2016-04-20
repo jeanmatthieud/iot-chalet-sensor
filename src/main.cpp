@@ -21,9 +21,9 @@
 #define NB_MEASURES_SKIP 1
 
 // - Sleep unit
-#define SLEEP_STEP_DURATION SLEEP_250MS
+#define SLEEP_STEP_DURATION SLEEP_8S
 // - Sleep factor
-#define SLEEP_STEP_NB 6
+#define SLEEP_STEP_NB 5400 // 5400 * 8s = 12h
 
 // - RF message payload size
 #define PAYLOAD_SIZE 3
